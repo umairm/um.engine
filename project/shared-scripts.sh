@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# Alias the 'pushd' command and have it send its output to the abyss ...
+pushd() {
+    command pushd "$@" > /dev/null
+}
+
+# Alias the 'popd' command and have it send its output to the abyss ...
+popd() {
+    command popd "$@" > /dev/null
+}
+
+#given the name of the homebrew formulae check if its installed if not then install it
+fetch_brew_dependency() {
+	FORMULA_NAME=$1
+	echo "Fetching brew dependency: '$FORMULA_NAME'."
+	if brew ls --versions $FORMULA_NAME > /dev/null; then
+		echo "Dependency '$FORMULA_NAME' is already installed, continuing ..."
+	else 
+		echo "Dependency '$FORMULA_NAME' is not installed, installing via Homebrew ..."
+		brew install $FORMULA_NAME
+	fi
+}
+
+#if nothing has created the third-party folder yet, then we'll create it.
+verify_third_party_folder_exists() {
+	#navigate nto the 'root' folder from our current location.
+	pushd ../../
+		#check if there is no third-party folder ...
+		if [ ! -d "third-party" ]; then
+			# ... and if there isn't create it.
+			mkdir third-party
+		fi
+	popd
+}
+
+#if required, download the sdl library source into the third-party folder.
+fetch_third_party_lib_sdl () {
+	#make sure we acutally have a third-party folder first.
+	verify_third_party_folder_exists
+
+	#navigate into the third-party folder two levels below us.
+	pushd ../../third-party
+		#check to see if there is not yet an sdl folder.
+		if [ ! -d "SDL" ]; then
+			echo "Fetching SDL (SDL2: 2.0.12) ..."
+
+			#download the sdl2 source zip file
+			wget https://www.libsdl.org/release/SDL2-2.0.12.zip
+
+			#unzip the file into the current folder
+			unzip -q SDL2-2.0.12.zip
+
+			#rename the sdl2-2.0.12 folder to sdl
+			mv SDL2-2.0.12 SDL
+
+			#clean up by deleting the zip file that we downloaded.
+			rm SDL2-2.0.12.zip
+		else 
+			echo "SDL Library already exists in third party folder."
+		fi
+
+	popd
+}
+
+
+# If nothing has created the Frameworks folder yet, then we'll create it.
+verify_frameworks_folder_exists() {
+    # Check if the Frameworks folder exists ...
+    if [ ! -d "Frameworks" ]; then
+        # ... and if not, create it.
+        mkdir Frameworks
+    fi
+}
+
+# If required, download the SDL2 MacOS Framework into the Frameworks folder.
+fetch_framework_sdl2() {
+    # Make sure there is a Frameworks folder in the current directory.
+    verify_frameworks_folder_exists
+
+    # Navigate into the Frameworks folder
+    pushd Frameworks
+        # Check that there isn't already an SDL2.framework folder
+        if [ ! -d "SDL2.framework" ]; then
+            # Download the .dmg file from the SDL2 download site.
+            wget https://www.libsdl.org/release/SDL2-2.0.12.dmg
+			
+            echo "Mounting DMG file ..."
+            hdiutil attach SDL2-2.0.12.dmg
+			
+            echo "Copying SDL2.framework from DMG file into the current folder ..."
+            cp -R /Volumes/SDL2/SDL2.framework .
+			
+            echo "Unmounting DMG file ..."
+            hdiutil detach /Volumes/SDL2
+
+            echo "Deleting DMG file ..."
+            rm SDL2-2.0.12.dmg
+			
+            # Navigate into the SDL2.framework folder.
+            pushd SDL2.framework
+                echo "Code signing SDL2.framework ..."
+                codesign -f -s - SDL2
+            popd
+        else
+            echo "SDL2.framework already exists ..."
+        fi
+    popd
+}
+
+verify_build_folder_exists() {
+    echo "Checking for build folder ..."
+    if [ ! -d "build" ]; then
+        mkdir build
+    fi
+}
+
